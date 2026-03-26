@@ -82,7 +82,7 @@ def test_angular_distance_symmetry():
 def test_observation_shape_and_range():
     env = FiberOrientationEnv()
     obs, _ = env.reset(seed=7)
-    assert obs.shape == (128, 128, 1)
+    assert obs.shape == (128, 128, 2)
     assert obs.dtype == np.uint8
     assert obs.min() >= 0
     assert obs.max() <= 255

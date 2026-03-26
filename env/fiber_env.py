@@ -38,7 +38,9 @@ def angular_distance(a: float, b: float) -> float:
 class FiberOrientationEnv(gymnasium.Env):
     """Entorno de orientación de fibras musculares.
 
-    Observation: imagen de fibras, shape (1, 128, 128), dtype float32, rango [0, 1].
+    Observation: 2 canales HWC (H, W, 2) uint8:
+                   canal 0 = imagen objetivo, canal 1 = imagen estimada actual.
+                 Esto permite al agente comparar ambas imágenes y ajustar su estimación.
     Action:      continua, shape (1,), rango [-1, 1].
                  Se mapea a delta_theta: acción * MAX_DELTA_DEG.
     Reward:      compute_reward(img_objetivo, img_estimada_actual).
@@ -58,11 +60,11 @@ class FiberOrientationEnv(gymnasium.Env):
         self.render_mode = render_mode
         self.size = size
 
-        # HWC uint8 [0,255]: VecTransposeImage convierte a CHW; CnnPolicy normaliza internamente
+        # HWC 2 canales: [img_objetivo, img_estimada] — el agente ve ambas para comparar
         self.observation_space = spaces.Box(
             low=0,
             high=255,
-            shape=(size, size, 1),
+            shape=(size, size, 2),
             dtype=np.uint8,
         )
         self.action_space = spaces.Box(
@@ -75,6 +77,7 @@ class FiberOrientationEnv(gymnasium.Env):
         self._theta_objetivo: float = 0.0
         self._theta_estimado: float = INITIAL_THETA_ESTIMATE
         self._img_objetivo: Optional[np.ndarray] = None
+        self._img_estimada: Optional[np.ndarray] = None
         self._step_count: int = 0
 
         self._fig = None
@@ -102,6 +105,7 @@ class FiberOrientationEnv(gymnasium.Env):
         self._step_count = 0
 
         self._img_objetivo = generate_fiber_image(self._theta_objetivo, size=self.size)
+        self._img_estimada = generate_fiber_image(self._theta_estimado, size=self.size)
 
         obs = self._get_obs()
         info = self._get_info()
@@ -128,8 +132,8 @@ class FiberOrientationEnv(gymnasium.Env):
         self._theta_estimado = float(np.clip(self._theta_estimado + delta, 0.0, 179.999))
         self._step_count += 1
 
-        img_estimada = generate_fiber_image(self._theta_estimado, size=self.size)
-        reward = compute_reward(self._img_objetivo, img_estimada)
+        self._img_estimada = generate_fiber_image(self._theta_estimado, size=self.size)
+        reward = compute_reward(self._img_objetivo, self._img_estimada)
 
         error = angular_distance(self._theta_estimado, self._theta_objetivo)
         terminated = bool(error < TERMINATION_THRESHOLD_DEG)
@@ -144,7 +148,7 @@ class FiberOrientationEnv(gymnasium.Env):
         )
 
         if self.render_mode == "human":
-            self._render_frame(img_estimada)
+            self._render_frame()
 
         return obs, reward, terminated, truncated, info
 
@@ -165,8 +169,8 @@ class FiberOrientationEnv(gymnasium.Env):
     # ------------------------------------------------------------------
 
     def _get_obs(self) -> np.ndarray:
-        """Devuelve la observación en formato HWC uint8 [0,255]."""
-        return self._img_objetivo[..., np.newaxis]  # (H, W, 1) uint8
+        """Devuelve observación 2 canales (H, W, 2) uint8: [objetivo, estimada]."""
+        return np.stack([self._img_objetivo, self._img_estimada], axis=-1)  # (H, W, 2)
 
     def _get_info(self, error: Optional[float] = None) -> dict[str, Any]:
         """Construye el diccionario info."""
@@ -178,12 +182,11 @@ class FiberOrientationEnv(gymnasium.Env):
             "theta_estimated": self._theta_estimado,
         }
 
-    def _render_frame(self, img_estimada: Optional[np.ndarray] = None) -> None:
+    def _render_frame(self) -> None:
         """Muestra imagen objetivo e imagen estimada lado a lado."""
         import matplotlib.pyplot as plt
 
-        if img_estimada is None:
-            img_estimada = generate_fiber_image(self._theta_estimado, size=self.size)
+        img_estimada = self._img_estimada if self._img_estimada is not None else generate_fiber_image(self._theta_estimado, size=self.size)
 
         if self._fig is None:
             self._fig, self._axes = plt.subplots(1, 2, figsize=(8, 4))

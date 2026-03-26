@@ -7,7 +7,6 @@ import os
 import numpy as np
 import torch
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 
 from env.fiber_env import FiberOrientationEnv, angular_distance
 from env.synthetic_generator import generate_fiber_image
@@ -43,47 +42,37 @@ def evaluate(
     model = PPO.load(model_path)
 
     thetas_true = np.linspace(0.0, 180.0, n_images, endpoint=False)
-
     results = []
 
-    def make_env():
-        return FiberOrientationEnv()
-
-    vec_env = DummyVecEnv([make_env])
-    vec_env = VecTransposeImage(vec_env)
+    env = FiberOrientationEnv()
 
     for theta_true in thetas_true:
-        obs = vec_env.reset()
+        # Inyectar theta conocido directamente en el entorno
+        env._theta_objetivo = float(theta_true)
+        env._theta_estimado = 90.0
+        env._step_count = 0
+        env._img_objetivo = generate_fiber_image(float(theta_true), size=env.size)
+        env._img_estimada = generate_fiber_image(env._theta_estimado, size=env.size)
 
-        # Inyectar imagen con theta conocido sobreescribiendo el estado interno
-        raw_env: FiberOrientationEnv = vec_env.envs[0]  # type: ignore[attr-defined]
-        raw_env._theta_objetivo = float(theta_true)
-        raw_env._theta_estimado = 90.0
-        raw_env._step_count = 0
-        raw_env._img_objetivo = generate_fiber_image(theta_true, size=raw_env.size)
-
-        # Reconstruir obs con la imagen inyectada
-        img_norm = raw_env._img_objetivo.astype(np.float32) / 255.0
-        obs_np = img_norm[np.newaxis, np.newaxis, ...]  # (1, 1, H, W) → VecTransposeImage convierte a (1, H, W, 1) → luego transpone
-
-        # Re-wrap: usar obs directamente del env (más limpio)
-        obs_list = [raw_env._get_obs()]
-        obs = np.array(obs_list)  # (1, H, W, 1) → VecTransposeImage convierte a (1, 1, H, W)
+        # Observación en formato CHW float32 normalizado (lo que espera CnnPolicy)
+        obs = _to_policy_obs(env._get_obs())
 
         done = False
-        theta_predicted = raw_env._theta_estimado
+        theta_predicted = env._theta_estimado
 
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, _, dones, infos = vec_env.step(action)
-            done = bool(dones[0])
-            theta_predicted = infos[0].get("theta_estimated", theta_predicted)
+            # Aplanar acción: model.predict devuelve (1,1) sin VecEnv
+            _, _, terminated, truncated, info = env.step(action.flatten())
+            obs = _to_policy_obs(env._get_obs())
+            done = terminated or truncated
+            theta_predicted = info.get("theta_estimated", theta_predicted)
 
-        error = angular_distance(theta_predicted, theta_true)
+        error = angular_distance(theta_predicted, float(theta_true))
         results.append((float(theta_true), float(theta_predicted), float(error)))
         logger.debug("theta_true=%.2f  theta_pred=%.2f  error=%.2f", theta_true, theta_predicted, error)
 
-    vec_env.close()
+    env.close()
 
     errors = [r[2] for r in results]
     mae = float(np.mean(errors))
@@ -91,7 +80,6 @@ def evaluate(
     pct_lt10 = float(np.mean([e < 10.0 for e in errors]) * 100)
 
     metrics = {"mae": mae, "pct_lt5": pct_lt5, "pct_lt10": pct_lt10}
-
     logger.info("MAE=%.2f°  | <5°: %.1f%%  | <10°: %.1f%%", mae, pct_lt5, pct_lt10)
 
     os.makedirs(os.path.dirname(output_csv) if os.path.dirname(output_csv) else "results", exist_ok=True)
@@ -102,3 +90,19 @@ def evaluate(
 
     logger.info("Resultados guardados en '%s'.", output_csv)
     return metrics
+
+
+def _to_policy_obs(obs_hwc: np.ndarray) -> np.ndarray:
+    """Convierte observación (H, W, C) uint8 → (1, C, H, W) float32 normalizado.
+
+    Replica lo que hacen DummyVecEnv + VecTransposeImage + normalize_images.
+
+    Args:
+        obs_hwc: Observación en formato (H, W, C) uint8.
+
+    Returns:
+        Array (1, C, H, W) float32 listo para model.predict.
+    """
+    # HWC → CHW
+    obs_chw = np.transpose(obs_hwc, (2, 0, 1)).astype(np.float32) / 255.0
+    return obs_chw[np.newaxis, ...]  # (1, C, H, W)

@@ -120,7 +120,7 @@ def train(
         n_epochs=10,
         gamma=0.99,
         verbose=1,
-        tensorboard_log=log_dir,
+        tensorboard_log=None,
         policy_kwargs={"normalize_images": True},
     )
 
