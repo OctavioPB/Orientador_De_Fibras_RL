@@ -14,6 +14,19 @@ from env.fiber_env import FiberOrientationEnv
 logger = logging.getLogger(__name__)
 
 
+def _tb_log_dir(log_dir: str) -> str | None:
+    """Retorna log_dir solo si TensorBoard está instalado; de lo contrario None."""
+    try:
+        import tensorboard  # noqa: F401
+        return log_dir
+    except ImportError:
+        logger.warning(
+            "TensorBoard no instalado — logs desactivados. "
+            "Instalar con: pip install tensorboard"
+        )
+        return None
+
+
 class MeanAngularErrorCallback(BaseCallback):
     """Callback que detiene el entrenamiento si el MAE < umbral por N evaluaciones consecutivas.
 
@@ -119,7 +132,7 @@ def train(
         n_epochs=10,
         gamma=0.99,
         verbose=1,
-        tensorboard_log=log_dir,  # directorio para logs de TensorBoard (tensorboard --logdir logs/)
+        tensorboard_log=_tb_log_dir(log_dir),  # None si TensorBoard no está instalado
         policy_kwargs={"normalize_images": True},
     )
 
