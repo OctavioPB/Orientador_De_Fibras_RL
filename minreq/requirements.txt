@@ -1,0 +1,13 @@
+# Dependencias mínimas para ejecutar el modelo preentrenado de orientación de fibras.
+# NO incluye dependencias de entrenamiento (stable-baselines3 training, tensorboard, pytest).
+
+# Entorno y modelo RL
+gymnasium>=0.29.0
+stable-baselines3>=2.3.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Visión computacional
+opencv-python>=4.8.0
+scikit-image>=0.21.0
+numpy>=1.24.0
