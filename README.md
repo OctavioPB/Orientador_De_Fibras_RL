@@ -30,7 +30,7 @@ sin necesidad de anotaciones manuales.
 | Algoritmo | PPO con CnnPolicy |
 | Visión | `opencv-python`, `scikit-image` |
 | Backend DL | PyTorch |
-| Visualización | `matplotlib` |
+| Visualización | `matplotlib`, `pandas` |
 | Tests | `pytest` |
 
 ## Estructura del proyecto
@@ -106,6 +106,34 @@ estimado con un vector de orientación superpuesto.
 ```bash
 python main.py infer --model models/ppo_v1 --image imagen.png --method ellipse
 ```
+
+### Visualizar evaluación
+
+```bash
+# Usar el CSV generado por eval (por defecto: results/eval_v2.csv)
+python plot_evaluation.py
+
+# Especificar CSV
+python plot_evaluation.py --csv results/eval.csv
+
+# Comparar dos evaluaciones
+python plot_evaluation.py --csv results/eval_v2.csv --compare results/eval.csv
+
+# Guardar figura en lugar de mostrarla
+python plot_evaluation.py --save results/eval_plots.png
+```
+
+Genera una figura con 7 paneles:
+- Scatter θ_real vs θ_predicho (coloreado por error)
+- Error angular por ángulo real con umbrales HU5
+- Distribución acumulada (CDF) del error
+- Histograma de errores con MAE y mediana
+- Diagrama polar del error por ángulo
+- Boxplot por cuadrante angular
+- Tabla de métricas con indicadores ✓/✗ vs umbrales
+
+El CSV de entrada debe tener las columnas `theta_true`, `theta_predicted`, `error_deg`
+(formato generado automáticamente por `python main.py eval`).
 
 ### Tests
 
