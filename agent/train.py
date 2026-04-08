@@ -15,25 +15,21 @@ logger = logging.getLogger(__name__)
 
 
 def _tb_log_dir(log_dir: str) -> str | None:
-    """Retorna log_dir solo si TensorBoard está instalado; de lo contrario None."""
     try:
         import tensorboard  # noqa: F401
         return log_dir
     except ImportError:
-        logger.warning(
-            "TensorBoard no instalado — logs desactivados. "
-            "Instalar con: pip install tensorboard"
-        )
+        logger.warning("TensorBoard no instalado — logs desactivados. Instalar con: pip install tensorboard")
         return None
 
 
 class MeanAngularErrorCallback(BaseCallback):
-    """Callback que detiene el entrenamiento si el MAE < umbral por N evaluaciones consecutivas.
+    """Detiene el entrenamiento si el MAE < umbral por N evaluaciones consecutivas.
 
     Args:
         eval_env: Entorno de evaluación.
         mae_threshold: MAE angular objetivo (grados).
-        n_consecutive: Evaluaciones consecutivas por debajo del umbral para detener.
+        n_consecutive: Número de evaluaciones consecutivas por debajo del umbral.
         eval_freq: Frecuencia de evaluación en timesteps.
         n_eval_episodes: Episodios por evaluación.
     """
@@ -82,7 +78,7 @@ class MeanAngularErrorCallback(BaseCallback):
                 self.mae_threshold, self._consecutive_count, self.n_consecutive,
             )
             if self._consecutive_count >= self.n_consecutive:
-                logger.info("Criterio de parada anticipada alcanzado. Deteniendo entrenamiento.")
+                logger.info("Criterio de parada anticipada alcanzado.")
                 return False
         else:
             self._consecutive_count = 0
@@ -114,14 +110,8 @@ def train(
     def make_env():
         return FiberOrientationEnv()
 
-    # DummyVecEnv envuelve el entorno en un vector de 1 instancia (requerido por SB3)
-    # VecTransposeImage convierte las observaciones de (H,W,C) a (C,H,W) para CnnPolicy
-    env = DummyVecEnv([make_env])
-    env = VecTransposeImage(env)
-
-    # Entorno de evaluación separado para no contaminar el estado de entrenamiento
-    eval_env_raw = DummyVecEnv([make_env])
-    eval_env = VecTransposeImage(eval_env_raw)
+    env = VecTransposeImage(DummyVecEnv([make_env]))
+    eval_env = VecTransposeImage(DummyVecEnv([make_env]))
 
     model = PPO(
         "CnnPolicy",
@@ -132,18 +122,15 @@ def train(
         n_epochs=10,
         gamma=0.99,
         verbose=1,
-        tensorboard_log=_tb_log_dir(log_dir),  # None si TensorBoard no está instalado
+        tensorboard_log=_tb_log_dir(log_dir),
         policy_kwargs={"normalize_images": True},
     )
 
-    # Guarda una copia del modelo cada 50 000 pasos para poder recuperar versiones anteriores
     checkpoint_callback = _CheckpointCallback(
         save_freq=50_000,
         save_path=os.path.dirname(save_path) or "models",
         name_prefix=os.path.basename(save_path),
     )
-
-    # Detiene el entrenamiento cuando el MAE baja de 8° por 3 evaluaciones consecutivas
     early_stop_callback = MeanAngularErrorCallback(
         eval_env=eval_env,
         mae_threshold=8.0,
@@ -153,11 +140,7 @@ def train(
     )
 
     logger.info("Iniciando entrenamiento PPO por %d timesteps.", total_timesteps)
-    model.learn(
-        total_timesteps=total_timesteps,
-        callback=[checkpoint_callback, early_stop_callback],
-    )
-
+    model.learn(total_timesteps=total_timesteps, callback=[checkpoint_callback, early_stop_callback])
     model.save(save_path)
     logger.info("Modelo guardado en '%s'.", save_path)
 
@@ -165,10 +148,6 @@ def train(
     eval_env.close()
     return model
 
-
-# ---------------------------------------------------------------------------
-# Checkpoint callback ligero (evita dep. de sb3-contrib)
-# ---------------------------------------------------------------------------
 
 class _CheckpointCallback(BaseCallback):
     """Guarda checkpoints del modelo cada save_freq timesteps."""
@@ -181,10 +160,7 @@ class _CheckpointCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         if self.num_timesteps % self.save_freq < self.training_env.num_envs:
-            path = os.path.join(
-                self.save_path,
-                f"{self.name_prefix}_{self.num_timesteps}_steps",
-            )
+            path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_steps")
             self.model.save(path)
             logger.info("Checkpoint guardado: %s", path)
         return True

@@ -1,4 +1,4 @@
-"""Generador de imágenes sintéticas de fibras musculares con orientación angular controlada."""
+"""Generador de imágenes sintéticas de fibras musculares con orientación controlada."""
 
 import logging
 
@@ -17,37 +17,29 @@ def generate_fiber_image(
     """Genera imagen sintética de fibras con orientación theta (grados).
 
     Args:
-        theta: Ángulo de orientación dominante en grados, rango [0, 180).
-        n_fibers: Número de fibras a dibujar (5–20).
+        theta: Ángulo de orientación dominante en grados [0, 180).
+        n_fibers: Número de fibras (5–20).
         noise_std: Desviación estándar del ruido gaussiano (0–15).
         size: Tamaño del lado de la imagen cuadrada en píxeles.
 
     Returns:
-        Array uint8 de shape (size, size) con las fibras sintetizadas.
+        Array uint8 de shape (size, size).
     """
     image = np.zeros((size, size), dtype=np.float32)
-
     rng = np.random.RandomState(int(theta * 1000) % (2**31))
-
-    fiber_length_range = (30, 60)
-    fiber_width_range = (4, 8)
 
     for _ in range(n_fibers):
         cx = rng.randint(0, size)
         cy = rng.randint(0, size)
-        length = rng.randint(fiber_length_range[0], fiber_length_range[1] + 1)
-        width = rng.randint(fiber_width_range[0], fiber_width_range[1] + 1)
+        length = rng.randint(30, 61)
+        width = rng.randint(4, 9)
+        # Variación ±5° para simular irregularidades de tinción
+        fiber_angle = theta + rng.uniform(-5.0, 5.0)
 
-        # Variación angular pequeña (±5°) para simular irregularidades reales de tinción
-        angle_jitter = rng.uniform(-5.0, 5.0)
-        fiber_angle = theta + angle_jitter
-
-        axes = (length // 2, width // 2)
-        center = (cx, cy)
         cv2.ellipse(
             image,
-            center,
-            axes,
+            (cx, cy),
+            (length // 2, width // 2),
             angle=fiber_angle,
             startAngle=0,
             endAngle=360,
@@ -55,11 +47,8 @@ def generate_fiber_image(
             thickness=-1,
         )
 
-    # Ruido gaussiano (usando rng para garantizar determinismo)
     if noise_std > 0:
-        noise = rng.normal(loc=0.0, scale=noise_std, size=image.shape).astype(np.float32)
-        image = image + noise
+        image += rng.normal(0.0, noise_std, image.shape).astype(np.float32)
 
-    image = np.clip(image, 0, 255).astype(np.uint8)
     logger.debug("Imagen generada: theta=%.1f, n_fibers=%d, noise_std=%.1f", theta, n_fibers, noise_std)
-    return image
+    return np.clip(image, 0, 255).astype(np.uint8)

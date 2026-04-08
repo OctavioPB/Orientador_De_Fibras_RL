@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "orientador-de-fibras"
+version = "0.1.0"
+description = "Estimación de orientación angular de fibras musculares con PPO (HU5)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Octavio Perez Bravo" }]
+
+dependencies = [
+    "gymnasium>=0.29.0",
+    "stable-baselines3>=2.3.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "opencv-python>=4.8.0",
+    "scikit-image>=0.21.0",
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+]
+dev = [
+    "pytest>=7.4.0",
+]
+
+[project.scripts]
+fiber-orientation = "main:main"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "minreq*", "results*", "models*", "logs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
