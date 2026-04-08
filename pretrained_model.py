@@ -92,6 +92,7 @@ class FiberOrientationModel:
 
         path = Path(self._model_path)
         zip_path = path.with_suffix(".zip")
+        # SB3 acepta la ruta con o sin .zip; verificamos ambas variantes antes de cargar
         if not path.exists() and not zip_path.exists():
             logger.warning("Modelo no encontrado en '%s'. Usando fallback ellipse.", self._model_path)
             return
@@ -124,7 +125,7 @@ class FiberOrientationModel:
         from env.fiber_env import FiberOrientationEnv
         from env.synthetic_generator import generate_fiber_image
 
-        # El shape almacenado en observation_space es (C, H, W) tras VecTransposeImage
+        # SB3 guarda el observation_space tras VecTransposeImage, por lo que el shape es (C,H,W)
         n_channels = self._ppo_model.observation_space.shape[0]
 
         env = FiberOrientationEnv()
@@ -134,6 +135,8 @@ class FiberOrientationModel:
         env._img_estimada = generate_fiber_image(90.0, size=env.size)
 
         def _obs() -> np.ndarray:
+            # n_channels=1: modelo entrenado solo con imagen objetivo → (1,1,H,W)
+            # n_channels=2: modelo entrenado con [objetivo, estimada] → (1,2,H,W)
             if n_channels == 1:
                 return img.astype(np.float32)[np.newaxis, np.newaxis] / 255.0
             return np.transpose(env._get_obs(), (2, 0, 1)).astype(np.float32)[np.newaxis] / 255.0

@@ -40,8 +40,9 @@ def evaluate(
     env = FiberOrientationEnv()
 
     for theta_true in thetas_true:
+        # Inyectar ángulo conocido directamente, sin llamar reset() para evitar sorteo aleatorio
         env._theta_objetivo = float(theta_true)
-        env._theta_estimado = 90.0
+        env._theta_estimado = 90.0  # estimación inicial neutral
         env._step_count = 0
         env._img_objetivo = generate_fiber_image(float(theta_true), size=env.size)
         env._img_estimada = generate_fiber_image(env._theta_estimado, size=env.size)

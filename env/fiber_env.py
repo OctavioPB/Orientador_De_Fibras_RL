@@ -19,10 +19,10 @@ INITIAL_THETA_ESTIMATE = 90.0
 
 
 def angular_distance(a: float, b: float) -> float:
-    """Distancia angular simétrica entre dos ángulos en [0°, 90°].
+    """Distancia angular mínima entre dos ángulos de fibra en [0°, 180°).
 
-    Las fibras son simétricas (0° == 180°), por lo que se usa:
-        min(|a - b|, 180 - |a - b|)
+    Las fibras son simétricamente equivalentes a 180° de distancia (0° == 180°),
+    por lo que la distancia real es min(|a−b|, 180−|a−b|) ∈ [0°, 90°].
     """
     diff = abs(a - b) % 180.0
     return min(diff, 180.0 - diff)
@@ -56,6 +56,7 @@ class FiberOrientationEnv(gymnasium.Env):
         self._axes = None
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> tuple[np.ndarray, dict[str, Any]]:
+        """Reinicia el entorno con un nuevo ángulo objetivo aleatorio en [0°, 180°)."""
         super().reset(seed=seed)
         self._theta_objetivo = self.np_random.uniform(0.0, 180.0)
         self._theta_estimado = INITIAL_THETA_ESTIMATE
@@ -68,6 +69,7 @@ class FiberOrientationEnv(gymnasium.Env):
         return self._get_obs(), self._get_info()
 
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        """Aplica la acción (Δθ), actualiza la estimación y calcula recompensa SSIM."""
         delta = float(action[0]) * MAX_DELTA_DEG
         self._theta_estimado = float(np.clip(self._theta_estimado + delta, 0.0, 179.999))
         self._step_count += 1

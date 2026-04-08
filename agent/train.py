@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _tb_log_dir(log_dir: str) -> str | None:
+    """Devuelve log_dir si TensorBoard está instalado; None en caso contrario."""
     try:
         import tensorboard  # noqa: F401
         return log_dir
@@ -110,6 +111,7 @@ def train(
     def make_env():
         return FiberOrientationEnv()
 
+    # VecTransposeImage convierte observaciones (H,W,C) → (C,H,W), requerido por CnnPolicy
     env = VecTransposeImage(DummyVecEnv([make_env]))
     eval_env = VecTransposeImage(DummyVecEnv([make_env]))
 
@@ -159,6 +161,7 @@ class _CheckpointCallback(BaseCallback):
         self.name_prefix = name_prefix
 
     def _on_step(self) -> bool:
+        # La condición con módulo cubre el caso en que num_envs > 1 (salto > 1 timestep por _on_step)
         if self.num_timesteps % self.save_freq < self.training_env.num_envs:
             path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_steps")
             self.model.save(path)

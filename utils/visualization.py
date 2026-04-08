@@ -28,6 +28,7 @@ def build_visualization_b64(img: np.ndarray, angle_deg: float) -> str:
     p1 = (int(cx - length * cos_a), int(cy - length * sin_a))
     p2 = (int(cx + length * cos_a), int(cy + length * sin_a))
 
+    # Doble flecha bidireccional: las fibras no tienen sentido único
     cv2.arrowedLine(img_color, p1, p2, _ARROW_COLOR, 2, tipLength=0.15)
     cv2.arrowedLine(img_color, p2, p1, _ARROW_COLOR, 2, tipLength=0.15)
     cv2.putText(

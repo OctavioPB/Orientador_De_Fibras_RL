@@ -22,6 +22,7 @@ def compute_reward(img_real: np.ndarray, img_synthetic: np.ndarray, step_penalty
     if img_real.shape != img_synthetic.shape:
         raise ValueError(f"Shape mismatch: {img_real.shape} vs {img_synthetic.shape}")
 
+    # data_range indica a SSIM el rango máximo posible de los píxeles (255 para uint8, 1.0 para float)
     data_range = 255.0 if img_real.dtype == np.uint8 else 1.0
     similarity = ssim(img_real.astype(np.float64), img_synthetic.astype(np.float64), data_range=data_range)
     reward = 2.0 * similarity - 1.0 - step_penalty
